@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analogy transfers — Switchyard Technical Wiki</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Switchyard <span>Technical Wiki</span></a>
+    <nav class="sitenav">
+      <a href="index.html">Overview</a>
+      <a href="stack.html">1. Technology stack</a>
+      <a href="concepts.html">2. Concepts</a>
+      <a href="idea-diamonds.html">3. Idea diamonds</a>
+      <a href="use-cases.html">4. Use cases</a>
+      <a href="analogies.html" aria-current="page">5. Analogy transfers</a>
+      <a href="specs.html">6. Specs &amp; APIs</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<h1>5. Analogy transfers</h1>
+
+<p class="lede">How the idea maps to other stacks and spheres — and, just as importantly, where
+the mapping stops holding.</p>
+
+<h2 id="other-stacks">Transfer to another implementation stack</h2>
+
+<p>The architecture is not Rust-specific. Its seams transfer directly:</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Switchyard seam</th><th>Go analogue</th><th>Java/Kotlin analogue</th><th>TypeScript analogue</th></tr></thead>
+<tbody>
+<tr><td>Provider-neutral protocol types</td><td>Structs + tagged interfaces</td><td>Records/sealed interfaces</td><td>Discriminated unions</td></tr>
+<tr><td>Format codec registry</td><td>Interface implementations keyed by format</td><td>Strategy beans/service loader</td><td>Codec map with typed adapters</td></tr>
+<tr><td><code>Algorithm</code> step stream</td><td>Channel or iterator of commands</td><td><code>Flow</code>/Reactive Streams</td><td>Async generator</td></tr>
+<tr><td>Host-owned <code>CallModel</code> fulfillment</td><td>Callback over <code>context.Context</code></td><td>Suspended function/client port</td><td>Promise-returning client interface</td></tr>
+<tr><td>Route composition</td><td>Immutable config graph</td><td>Dependency-injection graph</td><td>Validated config factory</td></tr>
+<tr><td>Native HTTP ingress</td><td>Chi/Gin/Fiber</td><td>Spring WebFlux/Ktor</td><td>Fastify/Hono</td></tr>
+<tr><td>Metrics and traces</td><td>OpenTelemetry Go</td><td>Micrometer + OpenTelemetry</td><td>OpenTelemetry JS</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="takeaway">
+<p>The invariant to preserve is more important than the framework: <strong>normalize at the edge,
+decide over common types, and keep transport behind a target client.</strong></p>
+</div>
+
+<h2 id="other-domains">Transfer to other technical domains</h2>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Sphere</th><th>Switchyard analogue</th><th>Transferable lesson</th></tr></thead>
+<tbody>
+<tr><td>Compiler</td><td>Source languages → IR → optimization pass → target code</td><td>A neutral representation lets many inputs share one decision engine</td></tr>
+<tr><td>Service mesh</td><td>Virtual service → traffic policy → cluster endpoint</td><td>A stable logical name can hide weighted, failover, or policy-selected destinations</td></tr>
+<tr><td>Database optimizer</td><td>SQL → logical plan → cost model → physical plan</td><td>Selection quality depends on explicit evidence and measurable outcomes</td></tr>
+<tr><td>Message broker</td><td>Topic → routing key → consumer group</td><td>Producers should not need endpoint identity or balancing logic</td></tr>
+<tr><td>Feature flags</td><td>Stable feature key → targeting rule → variant</td><td>Random routing is useful only when assignment and outcomes are observable</td></tr>
+<tr><td>Storage tiering</td><td>Hot/warm/cold policy → storage class</td><td>Expensive capability should be allocated according to workload signals</td></tr>
+<tr><td>SRE incident response</td><td>Triage → escalation → specialist handoff</td><td>Stage routing is a machine analogue of escalating uncertainty and returning routine work after stabilization</td></tr>
+<tr><td>Airline or rail hub</td><td>Passenger contract → routing hub → changing vehicle/line</td><td>The journey remains recognizable while the underlying leg is substituted</td></tr>
+<tr><td>Human work allocation</td><td>Intake rubric → skill-based queue → worker</td><td>“Strong” and “weak” are contextual roles; assignment should match the task, not rank people globally</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="limits">Limits of the analogies</h2>
+
+<p>LLM routing decisions can be probabilistic and model-generated. Unlike a packet router,
+Switchyard may spend an extra inference call to decide where work goes, and unlike a compiler,
+translation between provider APIs can be lossy. That is why fallback policy, preservation,
+decision logs, and outcome measurement are part of the core idea rather than optional polish.</p>
+
+<nav class="pagenav">
+  <a class="prev" href="use-cases.html"><span>Previous</span>← 4. Use cases and examples</a>
+  <a class="next" href="specs.html"><span>Next</span>6. Specifications and APIs →</a>
+</nav>
+
+</main>
+</body>
+</html>

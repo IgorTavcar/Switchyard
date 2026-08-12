@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Most important concepts — Switchyard Technical Wiki</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Switchyard <span>Technical Wiki</span></a>
+    <nav class="sitenav">
+      <a href="index.html">Overview</a>
+      <a href="stack.html">1. Technology stack</a>
+      <a href="concepts.html" aria-current="page">2. Concepts</a>
+      <a href="idea-diamonds.html">3. Idea diamonds</a>
+      <a href="use-cases.html">4. Use cases</a>
+      <a href="analogies.html">5. Analogy transfers</a>
+      <a href="specs.html">6. Specs &amp; APIs</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<h1>2. Most important concepts</h1>
+
+<p class="lede">The mechanics behind the system: how configuration is layered, how a request is
+normalized and decided on, and which behaviors are contracts rather than implementation
+details.</p>
+
+<h2 id="clients-targets-routes">2.1 LLM clients, targets, and routes</h2>
+
+<p>A native deployment has three named layers:</p>
+
+<pre><code>LLM client (transport + credential + format)
+└── target (one upstream model ID)
+    └── route (one client-visible model ID + one algorithm)</code></pre>
+
+<p>The names in the TOML tables are local references. A target's <code>id</code> is sent to the
+upstream provider; a route's <code>id</code> is sent by the client to Switchyard. This small
+distinction prevents transport configuration, provider model identity, and public product
+identity from collapsing into one string.</p>
+
+<h2 id="normalize-decide-translate">2.2 Normalize, decide, translate</h2>
+
+<p>Inbound JSON is decoded into provider-neutral <code>switchyard-protocol</code> values.
+Algorithms inspect that representation and publish a <code>Decision</code>; they do not need
+OpenAI or Anthropic SDK objects. The selected target then receives an encoded request in its
+configured format. Responses and stream events take the reverse path.</p>
+
+<p>Supported wire formats are:</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Format ID</th><th>Client/server endpoint</th><th>Upstream endpoint</th></tr></thead>
+<tbody>
+<tr><td><code>openai_chat</code></td><td><code>/v1/chat/completions</code></td><td><code>/v1/chat/completions</code></td></tr>
+<tr><td><code>openai_responses</code></td><td><code>/v1/responses</code></td><td><code>/v1/responses</code></td></tr>
+<tr><td><code>anthropic_messages</code></td><td><code>/v1/messages</code></td><td><code>/v1/messages</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The normalized model includes instructions, messages, text and media content, tool
+definitions/calls/results, sampling, output limits, reasoning controls, usage, stop reasons,
+metadata, and provider extensions. Preservation metadata keeps exact same-format payloads
+available when a lossless replay is possible.</p>
+
+<h2 id="algorithms-are-policies">2.3 Algorithms are policies, not transports</h2>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Algorithm</th><th>Decision rule</th><th>Extra model calls</th></tr></thead>
+<tbody>
+<tr><td><code>passthrough</code></td><td>Always use one target</td><td>None</td></tr>
+<tr><td><code>random</code></td><td>Uniform or weighted target selection</td><td>None</td></tr>
+<tr><td><code>llm_classifier</code>, capability mode</td><td>Judge the request, then select efficient or capable</td><td>One judge call unless affinity reuses a decision</td></tr>
+<tr><td><code>llm_classifier</code>, escalation mode</td><td>Serve efficient first; judge the completed trajectory and latch capable when needed</td><td>One answer call plus judge calls until latched</td></tr>
+<tr><td><code>llm_classifier</code>, custom mode</td><td>Validate a custom judge schema, then resolve a target label</td><td>One judge call unless affinity reuses a decision</td></tr>
+<tr><td><code>stage_router</code></td><td>Score tool-result and progress signals; optionally ask a judge on ambiguous turns</td><td>None on decisive signals; optional judge on ties</td></tr>
+<tr><td><code>noop</code></td><td>Return <code>OK</code> locally</td><td>None; intended for smoke tests</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>“Capable,” “efficient,” “strong,” and “weak” are roles inside an algorithm, not properties
+permanently attached to a model.</p>
+
+<h2 id="python-chain-shape">2.4 Fixed Python chain shape</h2>
+
+<p>The Python compatibility chain is constructed as:</p>
+
+<pre><code>request processor* → exactly one LLMBackend → response processor* → TranslationEngine</code></pre>
+
+<p>Request processors transform <code>ChatRequest</code>; response processors transform
+<code>ChatResponse</code>; the backend performs the model call; the translator returns the
+client's wire contract. <code>ProxyContext</code> carries per-request facts such as the selected
+target, backend latency, evicted targets, and component metadata.</p>
+
+<h2 id="host-owned-calls">2.5 Host-owned calls in libsy</h2>
+
+<p><code>switchyard-libsy</code> does not own HTTP. An <code>Algorithm</code> emits a stream of
+<code>Step</code> values. A <code>Step::CallModel</code> gives the host a normalized request and
+decision; the host responds with the model result. <code>Step::ReturnToAgent</code> ends the run.
+This inversion lets an existing gateway keep its connection pools, retries, auth, quotas, and
+audit controls.</p>
+
+<h2 id="streaming-contract">2.6 Streaming is a first-class contract</h2>
+
+<p>Streaming is not implemented as “buffer, then fake SSE.” The protocol carries a
+single-consumption response stream; codecs translate events incrementally and finish
+provider-specific terminal events. Python <code>ChatResponseStream</code> supports
+<code>tap</code>, <code>map</code>, <code>on_complete</code>, and <code>aclose</code>, so
+observation and cleanup stay part of the stream lifecycle.</p>
+
+<h2 id="session-affinity">2.7 Session identity and affinity</h2>
+
+<p>Canonical <code>x-switchyard-*</code> metadata normalizes session, agent, parent-agent, task,
+turn, request, and subagent signals from supported harnesses. Classifier routes can reuse the
+first target decision for a session. A first-message hash is available as a weaker fallback when
+clients cannot provide a session ID.</p>
+
+<div class="note">
+<p>Affinity is process-local. It improves conversation consistency and avoids repeated judge
+calls, but it is not a distributed sticky-session store.</p>
+</div>
+
+<h2 id="context-window-eviction">2.8 Context-window eviction</h2>
+
+<p>When an upstream reports a context-window 4xx, routing can mark that target as evicted and
+retry another eligible target. If every candidate overflows, the caller receives a typed
+pool-exhausted failure rather than an unbounded retry. See
+<a href="../docs/operations/context_window.md">Context-Window Handling</a>.</p>
+
+<h2 id="observability">2.9 Observability belongs to the decision path</h2>
+
+<p>The server records the selected model, rationale, answer/judge usage, model-call latency,
+routing overhead, cache tokens, reasoning tokens, fail-open events, and upstream attempts.
+<code>/v1/stats</code> gives an operational snapshot; <code>/metrics</code> exposes Prometheus
+data; optional JSONL routing logs support exact session aggregation.</p>
+
+<nav class="pagenav">
+  <a class="prev" href="stack.html"><span>Previous</span>← 1. Technology stack</a>
+  <a class="next" href="idea-diamonds.html"><span>Next</span>3. Idea diamonds →</a>
+</nav>
+
+</main>
+</body>
+</html>

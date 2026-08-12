@@ -21,7 +21,6 @@ nav:
       - Getting Started: getting_started.md
       - Known Issues: known_issues.md
   - Concepts:
-      - Technical Wiki: technical_wiki.md
       - Core Concepts: core_concepts.md
       - Architecture: architecture.md
   - Routing:

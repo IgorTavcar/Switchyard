@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Specifications and APIs — Switchyard Technical Wiki</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Switchyard <span>Technical Wiki</span></a>
+    <nav class="sitenav">
+      <a href="index.html">Overview</a>
+      <a href="stack.html">1. Technology stack</a>
+      <a href="concepts.html">2. Concepts</a>
+      <a href="idea-diamonds.html">3. Idea diamonds</a>
+      <a href="use-cases.html">4. Use cases</a>
+      <a href="analogies.html">5. Analogy transfers</a>
+      <a href="specs.html" aria-current="page">6. Specs &amp; APIs</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<h1>6. Specifications and APIs</h1>
+
+<p class="lede">Supported contracts and canonical references. This page catalogs the supported
+surfaces; the linked <a href="../docs/reference/toml_schema.md">TOML schema</a>,
+<a href="../docs/cli_reference.md">CLI reference</a>, and
+<a href="../docs/reference/rust_api.md">generated Rust API</a> remain the normative, field-level
+references.</p>
+
+<ul class="cards">
+  <li><a href="#http-api"><strong>6.1 HTTP API</strong><span>Native server routes, headers, and metadata.</span></a></li>
+  <li><a href="#toml-schema"><strong>6.2 TOML schema</strong><span>Native deployment configuration shape.</span></a></li>
+  <li><a href="#cli-api"><strong>6.3 CLI API</strong><span>Launch, serve, and the standalone binary.</span></a></li>
+  <li><a href="#python-api"><strong>6.4 Public Python API</strong><span>Requests, chains, backends, dispatch, hosting.</span></a></li>
+  <li><a href="#libsy-api"><strong>6.5 Python libsy API</strong><span>Rust algorithms with host-owned clients.</span></a></li>
+  <li><a href="#rust-api"><strong>6.6 Rust crate APIs</strong><span>Principal public API per crate.</span></a></li>
+  <li><a href="#lifecycle"><strong>6.7 Error and lifecycle</strong><span>Retry, fail-open, and shutdown contracts.</span></a></li>
+</ul>
+
+<h2 id="http-api">6.1 HTTP API</h2>
+
+<p>The native server exposes these routes:</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Request/response contract</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>POST</code></td><td><code>/v1/chat/completions</code></td><td>OpenAI Chat Completions</td><td>Buffered and streaming</td></tr>
+<tr><td><code>POST</code></td><td><code>/v1/responses</code></td><td>OpenAI Responses</td><td>Buffered and streaming</td></tr>
+<tr><td><code>POST</code></td><td><code>/v1/messages</code></td><td>Anthropic Messages</td><td>Buffered and streaming</td></tr>
+<tr><td><code>POST</code></td><td><code>/v1/messages/count_tokens</code></td><td>Anthropic token-count request</td><td>Chooses an Anthropic-format target reachable by the route</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/models</code></td><td>OpenAI-compatible model list plus Codex model metadata</td><td>Lists route IDs, not every upstream provider model</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/stats</code></td><td>Per-model and routing statistics</td><td>Process-local snapshot</td></tr>
+<tr><td><code>POST</code></td><td><code>/v1/stats/reset</code></td><td>Empty reset request</td><td>Clears accumulated process stats</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/routing/session-stats?session_id=ID</code></td><td>Exact-session call and token totals</td><td>Registered only with a routing log</td></tr>
+<tr><td><code>GET</code></td><td><code>/metrics</code></td><td>Prometheus text</td><td>Process-wide OpenTelemetry instruments</td></tr>
+<tr><td><code>GET</code></td><td><code>/health</code></td><td>Liveness</td><td>Returns while the process is serving</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>All three generation endpoints read the route ID from the JSON <code>model</code> field. They
+can address any configured route regardless of the target's format.</p>
+
+<p>Successful routed responses can include:</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Header</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>x-model-router-selected-model</code></td><td>Upstream model selected for the answer call</td></tr>
+<tr><td><code>x-model-router-rationale</code></td><td>Human-readable routing reason, truncated to a safe header size</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Canonical request metadata uses <code>x-switchyard-session-id</code>,
+<code>x-switchyard-agent-id</code>, <code>x-switchyard-parent-agent-id</code>,
+<code>x-switchyard-is-subagent</code>, <code>x-switchyard-agent-kind</code>,
+<code>x-switchyard-agent-role</code>, <code>x-switchyard-task-id</code>,
+<code>x-switchyard-task-kind</code>, <code>x-switchyard-turn-id</code>,
+<code>x-switchyard-request-id</code>, and <code>x-switchyard-session-final</code>. The protocol
+also normalizes supported harness-native aliases. Send explicit Switchyard headers when you
+control the caller and need deterministic precedence.</p>
+
+<div class="note">
+<p>The Python FastAPI app factory registers the three generation endpoints,
+<code>/v1/models</code>, and <code>/health</code>. Components may contribute stats, metrics, or
+other operational endpoints. The native server table above is the complete standalone server
+contract.</p>
+</div>
+
+<h2 id="toml-schema">6.2 Native TOML deployment schema</h2>
+
+<p>Top-level shape:</p>
+
+<pre><code>schema_version = 1
+
+[llm_clients.&lt;local-name&gt;]
+# transport
+
+[targets.&lt;local-name&gt;]
+# upstream model
+
+[routes.&lt;local-name&gt;]
+# public model and algorithm</code></pre>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Table</th><th>Required fields</th><th>Optional fields</th></tr></thead>
+<tbody>
+<tr><td>Root</td><td><code>schema_version = 1</code>, <code>targets</code>, <code>routes</code></td><td><code>llm_clients</code></td></tr>
+<tr><td><code>llm_clients.&lt;name&gt;</code></td><td><code>format</code>, <code>base_url</code></td><td><code>api_key_env</code>, <code>extra_headers</code>, <code>max_retries</code> (default <code>2</code>, range <code>0..10</code>)</td></tr>
+<tr><td><code>targets.&lt;name&gt;</code></td><td><code>id</code>, <code>llm_client</code></td><td><code>extra_body</code></td></tr>
+<tr><td><code>routes.&lt;name&gt;</code></td><td><code>id</code>, <code>type</code></td><td><code>context_window</code>, <code>tool_calling</code>, <code>reasoning</code>, then type-specific keys</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Route-specific contracts:</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Type</th><th>Required</th><th>Important optional fields</th></tr></thead>
+<tbody>
+<tr><td><code>noop</code></td><td>No target fields</td><td>Common route metadata only</td></tr>
+<tr><td><code>passthrough</code></td><td><code>target</code></td><td>Common route metadata</td></tr>
+<tr><td><code>random</code></td><td><code>targets</code></td><td><code>weights</code>, <code>seed</code></td></tr>
+<tr><td><code>llm_classifier</code> capability</td><td><code>classifier_target</code>, <code>strong_target</code>, <code>weak_target</code>, <code>base_threshold</code></td><td><code>threshold_step</code>, affinity, recent window, prompt, judge token limit</td></tr>
+<tr><td><code>llm_classifier</code> escalation</td><td><code>classifier_target</code>, <code>strong_target</code>, <code>weak_target</code></td><td>prompt, confirmation count, trajectory window and character cap</td></tr>
+<tr><td><code>llm_classifier</code> custom</td><td><code>classifier_target</code>, <code>targets</code>, <code>default_target</code>, <code>prompt</code>, <code>response_schema</code>, <code>policy</code></td><td>affinity, recent window, judge token limit</td></tr>
+<tr><td><code>stage_router</code></td><td><code>capable_target</code>, <code>efficient_target</code>, <code>picker</code>, <code>confidence_threshold</code></td><td>recent window, tier prompts, handoff notes, classifier fallback</td></tr>
+</tbody>
+</table>
+</div>
+
+<p><code>api_key_env</code> contains an environment-variable name, never the key. Target
+<code>extra_body</code> is shallow-merged only where the inbound request has not already set the
+key. <code>format</code> is explicit; the server does not probe an upstream to guess its API.</p>
+
+<p>Use the <a href="../docs/reference/toml_schema.md">complete TOML schema</a> for every field,
+default, range, cross-field constraint, and validation behavior. Validate before binding a
+socket:</p>
+
+<pre><code>switchyard-server --config routes.toml --dry-run</code></pre>
+
+<h2 id="cli-api">6.3 CLI API</h2>
+
+<pre><code>switchyard launch &lt;claude|codex|openclaw&gt; --model ID [--config PATH] [-- AGENT_ARGS]
+switchyard serve --routes PATH [transport and logging options]
+switchyard-server --config PATH [server options]</code></pre>
+
+<p><code>switchyard launch</code> consumes native TOML and hosts the packaged native server.
+<code>switchyard serve</code> consumes the minimal Python YAML bundle.
+<code>switchyard-server</code> is the standalone Rust binary and supports dry-run validation,
+host/port, backlog, graceful-shutdown timeout, TLS certificate/key, and routing-log output. See
+the <a href="../docs/cli_reference.md">complete CLI reference</a>.</p>
+
+<h2 id="python-api">6.4 Public Python API</h2>
+
+<p>Install the core library with <code>pip install nemo-switchyard</code>; add
+<code>[server]</code>, <code>[cli]</code>, or <code>[all]</code> for optional surfaces. Imports
+use <code>switchyard</code>, not the distribution name.</p>
+
+<h3 id="python-requests">Requests, responses, and streams</h3>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>API</th><th>Contract</th></tr></thead>
+<tbody>
+<tr><td><code>ChatRequest.openai_chat(body)</code></td><td>Owned OpenAI Chat request</td></tr>
+<tr><td><code>ChatRequest.openai_responses(body)</code></td><td>Owned OpenAI Responses request</td></tr>
+<tr><td><code>ChatRequest.anthropic(body)</code></td><td>Owned Anthropic Messages request</td></tr>
+<tr><td><code>ChatRequest.body</code>, <code>.model</code>, <code>.validate()</code>, <code>.set_model()</code>, <code>.replace_body()</code></td><td>Read or mutate the owned request</td></tr>
+<tr><td><code>ChatResponse.openai_completion(body)</code> / <code>.openai_stream(stream)</code></td><td>OpenAI Chat response forms</td></tr>
+<tr><td><code>ChatResponse.openai_responses_completion(body)</code> / <code>.openai_responses_stream(stream)</code></td><td>OpenAI Responses forms</td></tr>
+<tr><td><code>ChatResponse.anthropic_completion(body)</code> / <code>.anthropic_stream(stream)</code></td><td>Anthropic forms</td></tr>
+<tr><td><code>ChatResponse.body</code>, <code>.stream</code>, <code>.replace_body()</code></td><td>Buffered/stream access</td></tr>
+<tr><td><code>AnyResponseStream.tap(callback)</code></td><td>Observe each event</td></tr>
+<tr><td><code>AnyResponseStream.map(callback)</code></td><td>Transform each event</td></tr>
+<tr><td><code>AnyResponseStream.on_complete(callback)</code></td><td>Run after normal exhaustion</td></tr>
+<tr><td><code>await AnyResponseStream.aclose()</code></td><td>Close the upstream source</td></tr>
+</tbody>
+</table>
+</div>
+
+<p><code>ChatRequestType</code> identifies the three request formats.
+<code>ChatResponseType</code> distinguishes format and buffered/streaming delivery.
+<code>OpenAIChatRequest</code>, <code>ResponsesChatRequest</code>,
+<code>AnthropicChatRequest</code>, and the format-specific response names exported at package
+root are compatibility aliases over these Rust-backed values. <code>AnyResponseStream</code> is
+the public alias for the underlying <code>ChatResponseStream</code> value.</p>
+
+<h3 id="python-chain">Chain and backend roles</h3>
+
+<pre><code>Switchyard(
+    *,
+    request_processors=None,
+    backend: LLMBackend,
+    response_processors=None,
+    translator,
+    fallback_target_on_evict=None,
+)
+
+await switchyard.call(request, ctx=None)</code></pre>
+
+<p>A custom <code>LLMBackend</code> implements:</p>
+
+<pre><code>@property
+def supported_request_types(self) -&gt; list[ChatRequestType]: ...
+
+async def call(
+    self, ctx: ProxyContext, request: ChatRequest
+) -&gt; ChatResponse: ...</code></pre>
+
+<p>Public backend/configuration APIs are:</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>API</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>LlmTarget(...)</code></td><td>Target ID, provider model, format, endpoint, body/header additions</td></tr>
+<tr><td><code>BackendFormat</code></td><td><code>AUTO</code>, <code>OPENAI</code>, <code>RESPONSES</code>, <code>ANTHROPIC</code></td></tr>
+<tr><td><code>OpenAiNativeBackend(target)</code></td><td>OpenAI Chat or Responses target backend</td></tr>
+<tr><td><code>AnthropicNativeBackend(target)</code></td><td>Anthropic Messages target backend</td></tr>
+<tr><td><code>RandomRoutingProcessorConfig(strong, weak, strong_probability=0.5, rng_seed=None)</code></td><td>Configuration value used by the random-routing compatibility surface</td></tr>
+<tr><td><code>ProxyContext(metadata=None, request_id=None)</code></td><td>Per-request shared state</td></tr>
+<tr><td><code>RequestMetadata.from_headers(headers)</code></td><td>Session/task metadata extraction</td></tr>
+<tr><td><code>TranslationEngine()</code></td><td>Request, response, and incremental stream translation</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The translation engine's main methods are <code>translate_request</code>,
+<code>translate_response</code>, <code>request_to</code>, <code>request_to_any_of</code>,
+<code>response_to</code>, <code>response_for_request</code>, <code>stream_for_request</code>, and
+<code>translate_stream</code>.</p>
+
+<h3 id="python-dispatch">Dispatch and HTTP hosting</h3>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>API</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>RouteTable()</code></td><td>Exact-match mapping from public model IDs to chains</td></tr>
+<tr><td><code>register(model, switchyard, metadata=None, default=False)</code></td><td>Add or replace a model route</td></tr>
+<tr><td><code>lookup_switchyard(model)</code></td><td>Resolve a chain; raises <code>KeyError</code> when absent</td></tr>
+<tr><td><code>registered_models()</code> / <code>registered_model_entries()</code></td><td>Discovery views</td></tr>
+<tr><td><code>set_default_model(model)</code> / <code>default_model()</code></td><td>Model-list default</td></tr>
+<tr><td><code>build_switchyard_app(runtime)</code></td><td>Build the FastAPI app; requires the <code>server</code> extra</td></tr>
+<tr><td><code>OpenAIChatEndpoint</code>, <code>ResponsesEndpoint</code>, <code>AnthropicMessagesEndpoint</code>, <code>ModelsEndpoint</code></td><td>Optional endpoint components</td></tr>
+</tbody>
+</table>
+</div>
+
+<p><code>RlLoggingRequestProcessor</code> and <code>RlLoggingResponseProcessor(log_dir)</code> are
+the public paired processors for local training-trace capture. They observe the request/response
+pair without changing the proxied response.</p>
+
+<h2 id="libsy-api">6.5 Python libsy API</h2>
+
+<p><code>switchyard.libsy</code> runs Rust-owned algorithms with Python-hosted clients:</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>API</th><th>Signature or role</th></tr></thead>
+<tbody>
+<tr><td><code>LlmClient</code></td><td>Protocol with <code>async call(request: Mapping) -&gt; Mapping</code></td></tr>
+<tr><td><code>LlmTarget(name, client)</code></td><td>Name plus host-owned model client</td></tr>
+<tr><td><code>algorithms.noop()</code></td><td>Local no-op algorithm</td></tr>
+<tr><td><code>algorithms.random(targets, weights=None, seed=None)</code></td><td>Weighted target selection</td></tr>
+<tr><td><code>algorithms.llm_task_classifier(judge, efficient, capable, config=...)</code></td><td>Capability classifier</td></tr>
+<tr><td><code>algorithms.stage_router(capable, efficient, ...)</code></td><td>Signal-driven tier routing</td></tr>
+<tr><td><code>TaskClassifierConfig(...)</code></td><td>Threshold, affinity, window, token budget, and prompt</td></tr>
+<tr><td><code>LlmFallback(judge_target, config=...)</code></td><td>Optional stage-router judge fallback</td></tr>
+<tr><td><code>await Algorithm.run(request, headers=None)</code></td><td>Returns decision records and aggregate normalized response</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The accepted request and returned response mappings are the serialized
+<code>switchyard-protocol</code> shapes, not OpenAI or Anthropic wire JSON.</p>
+
+<h2 id="rust-api">6.6 Rust crate APIs</h2>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Crate</th><th>Principal public API</th></tr></thead>
+<tbody>
+<tr><td><code>switchyard-protocol</code></td><td><code>Request</code>, <code>Response</code>, <code>LlmRequest</code>, <code>Message</code>, <code>ContentBlock</code>, tools, usage, streams, <code>Metadata</code>, <code>Decision</code>, <code>RoutedLlmClient</code>, <code>WireFormat</code></td></tr>
+<tr><td><code>switchyard-libsy</code></td><td><code>Algorithm</code>, <code>Step</code>, <code>CallModel</code>, <code>Driver</code>, <code>LlmTarget</code>, classifiers/processors/state, <code>Passthrough</code>, <code>Random</code>, <code>LlmTaskClassifier</code>, <code>StageRouter</code></td></tr>
+<tr><td><code>switchyard-translation</code></td><td><code>TranslationEngine</code>, codec registries, buffered/stream codecs, translation policy, diagnostics and errors</td></tr>
+<tr><td><code>switchyard-server</code></td><td><code>ServerState</code>, <code>ServerRunOptions</code>, <code>TlsOptions</code>, <code>BoundServer</code>, router builder and run functions</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The complete signatures, trait requirements, enum variants, error types, and method
+documentation for the embeddable public crates are generated as
+<a href="../docs/reference/rust_api.md">Rust API documentation</a>. Applications embedding libsy
+normally depend on both <code>switchyard-libsy</code> and <code>switchyard-protocol</code> at
+compatible versions.</p>
+
+<h2 id="lifecycle">6.7 Error, retry, and lifecycle contracts</h2>
+
+<ul>
+  <li>Configuration references, field ranges, duplicate IDs, and cross-field constraints fail
+    before serving; use <code>--dry-run</code> in deployment automation.</li>
+  <li>Native clients retry transport failures, timeouts, HTTP <code>408</code>, <code>429</code>,
+    and <code>5xx</code> up to the configured <code>max_retries</code> budget.</li>
+  <li>Classifier modes have an explicit default/fail-open target when the judge is unavailable or
+    its verdict is unusable.</li>
+  <li>Context-window failures can evict a target and retry another eligible target; retries are
+    bounded by the target pool.</li>
+  <li>Streams are single-consumer values. Cancellation must close the upstream source; terminal
+    usage is recorded after clean exhaustion.</li>
+  <li>Python chain components with <code>startup</code> and <code>shutdown</code> participate in
+    app lifespan order; shutdown runs in reverse order.</li>
+  <li>Unknown public model IDs fail exact-match dispatch instead of silently using an unrelated
+    backend.</li>
+</ul>
+
+<nav class="pagenav">
+  <a class="prev" href="analogies.html"><span>Previous</span>← 5. Analogy transfers</a>
+  <a class="next" href="index.html"><span>Next</span>Overview →</a>
+</nav>
+
+</main>
+</body>
+</html>

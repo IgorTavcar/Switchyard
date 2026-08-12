@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Use cases and examples — Switchyard Technical Wiki</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Switchyard <span>Technical Wiki</span></a>
+    <nav class="sitenav">
+      <a href="index.html">Overview</a>
+      <a href="stack.html">1. Technology stack</a>
+      <a href="concepts.html">2. Concepts</a>
+      <a href="idea-diamonds.html">3. Idea diamonds</a>
+      <a href="use-cases.html" aria-current="page">4. Use cases</a>
+      <a href="analogies.html">5. Analogy transfers</a>
+      <a href="specs.html">6. Specs &amp; APIs</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<h1>4. Use cases and examples</h1>
+
+<p class="lede">Where Switchyard can make a difference. Every example below corresponds to a
+different operational advantage. Replace the illustrative model IDs and URLs with models
+available from your provider.</p>
+
+<ul class="cards">
+  <li><a href="#uc1"><strong>1. Governed agent route</strong><span>Run Claude Code, Codex, or OpenClaw through one route ID.</span></a></li>
+  <li><a href="#uc2"><strong>2. Cross-format bridge</strong><span>Anthropic client, OpenAI-format backend.</span></a></li>
+  <li><a href="#uc3"><strong>3. Capability budgeting</strong><span>Spend the capable model only on hard work.</span></a></li>
+  <li><a href="#uc4"><strong>4. A/B or canary split</strong><span>Reproducible weighted traffic splitting.</span></a></li>
+  <li><a href="#uc5"><strong>5. Stage routing</strong><span>Route coding-agent turns by stage signals.</span></a></li>
+  <li><a href="#uc6"><strong>6. Domain rubric</strong><span>A custom judge schema over many targets.</span></a></li>
+  <li><a href="#uc7"><strong>7. Embedded routing</strong><span>Python-hosted transport, Rust-owned decisions.</span></a></li>
+  <li><a href="#uc8"><strong>8. Shared gateway</strong><span>One observable catalog for many internal clients.</span></a></li>
+</ul>
+
+<section class="usecase">
+<h2 id="uc1">Use case 1 — run coding agents through one governed model route</h2>
+
+<p class="difference">developers keep using Claude Code, Codex, or OpenClaw while the platform
+team owns model selection and observability behind the route ID.</p>
+
+<pre><code>uv tool install --python 3.12 "nemo-switchyard[cli,server]"
+export OPENROUTER_API_KEY="your-openrouter-key"
+
+switchyard launch codex --model switchyard
+# The same packaged deployment also supports:
+# switchyard launch claude --model switchyard
+# switchyard launch openclaw --model switchyard</code></pre>
+
+<p>For a custom deployment:</p>
+
+<pre><code>switchyard launch codex --model engineering --config routes.toml</code></pre>
+
+<p>The launcher starts the packaged native server, points the agent at it, forwards arguments
+after <code>--</code>, and stops the server when the agent exits. See the
+<a href="../docs/cli_reference.md#launcher-path-switchyard-launch">launcher CLI</a>.</p>
+</section>
+
+<section class="usecase">
+<h2 id="uc2">Use case 2 — bridge an Anthropic client to an OpenAI-format backend</h2>
+
+<p class="difference">the client and upstream can evolve independently. This is useful for
+provider migration, private inference, or one API surface across a mixed model fleet.</p>
+
+<pre><code>schema_version = 1
+
+[llm_clients.private_openai]
+format = "openai_chat"
+base_url = "https://llm.example.com/v1"
+api_key_env = "PRIVATE_LLM_KEY"
+
+[targets.assistant]
+id = "company/assistant-v3"
+llm_client = "private_openai"
+
+[routes.compatible]
+id = "company-assistant"
+type = "passthrough"
+target = "assistant"</code></pre>
+
+<p>Start the server, then send Anthropic Messages JSON to the route even though the target speaks
+OpenAI Chat Completions:</p>
+
+<pre><code>export PRIVATE_LLM_KEY="your-private-key"
+switchyard-server --config routes.toml --host 127.0.0.1 --port 4000
+
+curl http://localhost:4000/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "company-assistant",
+    "max_tokens": 128,
+    "messages": [{"role": "user", "content": "Explain tail latency."}]
+  }'</code></pre>
+
+<p>The returned body uses the Anthropic Messages contract. Requests, aggregate responses, tools,
+and streaming events all pass through the translation layer.</p>
+</section>
+
+<section class="usecase">
+<h2 id="uc3">Use case 3 — spend capable-model budget only on hard work</h2>
+
+<p class="difference">a capability judge forecasts whether an efficient model can solve the whole
+task. The deterministic threshold policy then chooses the tier.</p>
+
+<pre><code>schema_version = 1
+
+[llm_clients.openrouter]
+format = "openai_chat"
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+
+[targets.judge]
+id = "openai/gpt-4o-mini"
+llm_client = "openrouter"
+
+[targets.capable]
+id = "openai/gpt-4o"
+llm_client = "openrouter"
+
+[targets.efficient]
+id = "openai/gpt-4o-mini"
+llm_client = "openrouter"
+
+[routes.smart]
+id = "smart"
+type = "llm_classifier"
+mode = "capability"
+classifier_target = "judge"
+strong_target = "capable"
+weak_target = "efficient"
+base_threshold = 0.5
+threshold_step = 0.1
+session_affinity = true</code></pre>
+
+<pre><code>curl http://localhost:4000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "x-switchyard-session-id: demo-session" \
+  -d '{"model":"smart","messages":[{"role":"user","content":"Design a lock-free queue."}]}' \
+  -i</code></pre>
+
+<p>Inspect <code>x-model-router-selected-model</code> and <code>x-model-router-rationale</code> in
+the response. Treat the selection as model output, not a fixed test assertion. See
+<a href="../docs/routing_algorithms/llm_classifier_routing.md">LLM Classifier Routing</a>.</p>
+</section>
+
+<section class="usecase">
+<h2 id="uc4">Use case 4 — run a reproducible A/B or canary split</h2>
+
+<p class="difference">callers use one route while traffic is split by a reviewed server policy.
+Relative weights need not sum to one; a seed reproduces the same selection sequence for the same
+call order.</p>
+
+<pre><code>[routes.experiment]
+id = "assistant-experiment"
+type = "random"
+targets = ["control", "candidate"]
+weights = [9, 1]
+seed = 42</code></pre>
+
+<pre><code>for request_number in 1 2 3 4 5; do
+  curl -sS -D - http://localhost:4000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d "{\"model\":\"assistant-experiment\",\"messages\":[{\"role\":\"user\",\"content\":\"request ${request_number}\"}]}" \
+    -o /dev/null | grep -i '^x-model-router-selected-model:'
+done</code></pre>
+
+<p>Compare model-level requests, errors, tokens, and latency through <code>/v1/stats</code> or
+<code>/metrics</code>. See <a href="../docs/routing_algorithms/random_routing.md">Random
+Routing</a>.</p>
+</section>
+
+<section class="usecase">
+<h2 id="uc5">Use case 5 — route coding-agent turns by stage</h2>
+
+<p class="difference">early exploration, error recovery, and hard reasoning can use a capable
+model; settled edits and test loops can use an efficient one. Decisive tool signals avoid a judge
+call.</p>
+
+<pre><code>[routes.engineering]
+id = "engineering"
+type = "stage_router"
+capable_target = "capable"
+efficient_target = "efficient"
+picker = "efficient_first"
+confidence_threshold = 0.5
+recent_turn_window = 3
+
+[routes.engineering.handoff_notes]
+escalation_note = "The previous model was stalling; continue the diagnosis."
+deescalation_note = "The plan is settled; continue the mechanical work."</code></pre>
+
+<p>Start with <code>0.5</code>, then calibrate against representative agent trajectories. Pure
+chat workloads without tool-result history fall back to the picker's default tier. See
+<a href="../docs/routing_algorithms/stage_router_routing.md">Stage-Router Routing</a>.</p>
+</section>
+
+<section class="usecase">
+<h2 id="uc6">Use case 6 — turn a domain rubric into multi-target policy</h2>
+
+<p class="difference">custom classifier mode can choose among more than two targets using a
+strict JSON Schema and a deterministic JSON Pointer policy. For example, a support platform can
+separate fast FAQs, multilingual work, reasoning-heavy diagnosis, and premium escalation.</p>
+
+<pre><code>[routes.support]
+id = "support"
+type = "llm_classifier"
+mode = "custom"
+classifier_target = "judge"
+targets = ["fast", "multilingual", "reasoning", "premium"]
+default_target = "premium"
+prompt = """
+Choose the best configured target. Return JSON matching the supplied schema.
+"""
+response_schema = '''
+{
+  "type": "object",
+  "properties": {
+    "target": {
+      "type": "string",
+      "enum": ["fast", "multilingual", "reasoning", "premium"]
+    }
+  },
+  "required": ["target"],
+  "additionalProperties": false
+}
+'''
+
+[routes.support.policy]
+type = "target_selector"
+selector = "/target"</code></pre>
+
+<p>An invalid verdict, unavailable judge, missing pointer, or unknown target uses
+<code>default_target</code>. The judge schema is sent through provider structured-output
+configuration and validated again by Switchyard.</p>
+</section>
+
+<section class="usecase">
+<h2 id="uc7">Use case 7 — embed routing in Python without giving libsy the network</h2>
+
+<p class="difference">application-owned clients keep transport, test doubles, and credentials
+while Rust-owned algorithms make decisions.</p>
+
+<pre><code>import asyncio
+from collections.abc import Mapping
+
+from switchyard.libsy import LlmTarget, algorithms
+
+
+class EchoClient:
+    def __init__(self, model: str) -&gt; None:
+        self.model = model
+
+    async def call(
+        self, request: Mapping[str, object]
+    ) -&gt; Mapping[str, object]:
+        return {
+            "model": self.model,
+            "outputs": [{
+                "role": "assistant",
+                "content": [{"type": "text", "text": self.model}],
+            }],
+        }
+
+
+async def main() -&gt; None:
+    request = {
+        "model": "auto",
+        "messages": [{
+            "role": "user",
+            "content": [{"type": "text", "text": "Hello"}],
+        }],
+    }
+    algorithm = algorithms.random(
+        [
+            LlmTarget("fast", EchoClient("fast")),
+            LlmTarget("quality", EchoClient("quality")),
+        ],
+        weights=[1, 3],
+        seed=42,
+    )
+    decisions, response = await algorithm.run(request)
+    print(decisions, response)
+
+
+asyncio.run(main())</code></pre>
+
+<p>The repository contains the complete runnable
+<a href="../examples/libsy.py"><code>examples/libsy.py</code></a>.</p>
+</section>
+
+<section class="usecase">
+<h2 id="uc8">Use case 8 — operate a shared, observable model gateway</h2>
+
+<p class="difference">many internal clients can discover the same route catalog while operators
+see decision overhead, usage, cache behavior, failures, and exact session totals.</p>
+
+<pre><code>switchyard-server --config routes.toml \
+  --routing-log-file ./var/routing.jsonl \
+  --host 0.0.0.0 --port 4000
+
+curl http://localhost:4000/v1/models
+curl http://localhost:4000/v1/stats
+curl http://localhost:4000/metrics
+curl 'http://localhost:4000/v1/routing/session-stats?session_id=demo-session'</code></pre>
+
+<div class="note">
+<p>The session endpoint exists only when <code>--routing-log-file</code> is enabled and returns
+<code>404</code> for an unknown session. In production, put authentication and TLS at the
+appropriate trust boundary; a liveness response alone is not an access control mechanism.</p>
+</div>
+</section>
+
+<nav class="pagenav">
+  <a class="prev" href="idea-diamonds.html"><span>Previous</span>← 3. Idea diamonds</a>
+  <a class="next" href="analogies.html"><span>Next</span>5. Analogy transfers →</a>
+</nav>
+
+</main>
+</body>
+</html>

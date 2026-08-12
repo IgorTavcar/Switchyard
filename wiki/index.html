@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Switchyard Technical Wiki</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Switchyard <span>Technical Wiki</span></a>
+    <nav class="sitenav">
+      <a href="index.html" aria-current="page">Overview</a>
+      <a href="stack.html">1. Technology stack</a>
+      <a href="concepts.html">2. Concepts</a>
+      <a href="idea-diamonds.html">3. Idea diamonds</a>
+      <a href="use-cases.html">4. Use cases</a>
+      <a href="analogies.html">5. Analogy transfers</a>
+      <a href="specs.html">6. Specs &amp; APIs</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<h1>Switchyard Technical Wiki</h1>
+
+<p class="lede">A map of Switchyard: what it is made of, the ideas that matter, where it can
+create leverage, and how to use its supported interfaces. Each branch below moves from the
+system view to concrete specifications and examples.</p>
+
+<h2 id="what-it-is">A typed control plane for LLM traffic</h2>
+
+<p>Switchyard sits between LLM clients and model backends. It gives clients stable OpenAI- and
+Anthropic-compatible interfaces while it selects a target, translates the wire format, streams
+the result, and records what happened.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 990 250" role="img" aria-labelledby="flow-title flow-desc">
+  <title id="flow-title">Switchyard request and response path</title>
+  <desc id="flow-desc">Clients call a wire API, which decodes into a provider-neutral protocol.
+  A routing policy selects a target. Responses travel back along the same path, and both the
+  policy and the targets emit telemetry.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="arrowhead" d="M 0 0 L 10 5 L 0 10 z"></path>
+    </marker>
+  </defs>
+
+  <g class="node">
+    <rect x="10" y="44" width="168" height="72" rx="7"></rect>
+    <text class="t" x="94" y="70" text-anchor="middle">Clients</text>
+    <text class="s" x="94" y="88" text-anchor="middle">Claude Code · Codex</text>
+    <text class="s" x="94" y="103" text-anchor="middle">OpenClaw · SDKs</text>
+  </g>
+  <g class="node">
+    <rect x="208" y="44" width="168" height="72" rx="7"></rect>
+    <text class="t" x="292" y="70" text-anchor="middle">Wire API</text>
+    <text class="s" x="292" y="88" text-anchor="middle">Chat · Responses</text>
+    <text class="s" x="292" y="103" text-anchor="middle">Messages</text>
+  </g>
+  <g class="node">
+    <rect x="406" y="44" width="168" height="72" rx="7"></rect>
+    <text class="t" x="490" y="76" text-anchor="middle">Protocol</text>
+    <text class="s" x="490" y="94" text-anchor="middle">provider-neutral IR</text>
+  </g>
+  <g class="node">
+    <rect x="604" y="44" width="168" height="72" rx="7"></rect>
+    <text class="t" x="688" y="76" text-anchor="middle">Routing policy</text>
+    <text class="s" x="688" y="94" text-anchor="middle">algorithm decides</text>
+  </g>
+  <g class="node">
+    <rect x="802" y="44" width="168" height="72" rx="7"></rect>
+    <text class="t" x="886" y="70" text-anchor="middle">Targets</text>
+    <text class="s" x="886" y="88" text-anchor="middle">hosted · private</text>
+    <text class="s" x="886" y="103" text-anchor="middle">local</text>
+  </g>
+  <g class="node">
+    <rect x="520" y="185" width="300" height="52" rx="7"></rect>
+    <text class="t" x="670" y="206" text-anchor="middle">Telemetry</text>
+    <text class="s" x="670" y="224" text-anchor="middle">decisions · usage · latency · errors</text>
+  </g>
+
+  <path class="edge" marker-end="url(#arrow)" d="M 178 80 H 202"></path>
+  <path class="edge" marker-end="url(#arrow)" d="M 376 80 H 400"></path>
+  <path class="edge" marker-end="url(#arrow)" d="M 574 80 H 598"></path>
+  <path class="edge" marker-end="url(#arrow)" d="M 772 80 H 796"></path>
+
+  <path class="edge" marker-end="url(#arrow)" d="M 886 44 V 20 H 94 V 40"></path>
+  <text class="edge-label" x="490" y="14" text-anchor="middle">response path — translated back through the protocol and wire API</text>
+
+  <path class="edge" marker-end="url(#arrow)" d="M 688 116 V 181"></path>
+  <path class="edge" marker-end="url(#arrow)" d="M 886 116 V 211 H 824"></path>
+</svg>
+</div>
+
+<p>The shortest mental model is:</p>
+
+<pre><code>client contract + normalized conversation + routing policy + target transport</code></pre>
+
+<p>Those four concerns are deliberately separate. A caller can keep its API, a router can reason
+over common types, and a target can use a different provider protocol.</p>
+
+<div class="takeaway">
+<p><strong>Switchyard turns a model name into a governed, observable routing policy while
+preserving the client's native API.</strong></p>
+</div>
+
+<h2 id="sections">Sections</h2>
+
+<ul class="cards">
+  <li><a href="stack.html"><strong>1. Technology stack</strong><span>Runtimes, libraries, and which layer owns what.</span></a></li>
+  <li><a href="concepts.html"><strong>2. Most important concepts</strong><span>The mechanics behind the system, from targets to eviction.</span></a></li>
+  <li><a href="idea-diamonds.html"><strong>3. Idea diamonds</strong><span>The concepts worth exposing in a product or architecture story.</span></a></li>
+  <li><a href="use-cases.html"><strong>4. Use cases and examples</strong><span>Eight runnable examples, each with a different operational advantage.</span></a></li>
+  <li><a href="analogies.html"><strong>5. Analogy transfers</strong><span>How the idea maps to other stacks and spheres — and where it stops.</span></a></li>
+  <li><a href="specs.html"><strong>6. Specifications and APIs</strong><span>HTTP, TOML, CLI, Python, libsy, Rust crates, and lifecycle contracts.</span></a></li>
+</ul>
+
+<h2 id="navigation-index">Where to go deeper</h2>
+
+<p>This wiki catalogs the supported surfaces. The documentation set below remains the normative,
+field-level reference.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Need</th><th>Reference</th></tr></thead>
+<tbody>
+<tr><td>First installation and request</td><td><a href="../docs/getting_started.md">Getting Started</a></td></tr>
+<tr><td>Request lifecycle and crate layout</td><td><a href="../docs/architecture.md">Architecture</a></td></tr>
+<tr><td>LLM client/target/route terminology</td><td><a href="../docs/core_concepts.md">Core Concepts</a></td></tr>
+<tr><td>Compare routing policies</td><td><a href="../docs/routing_algorithms/overview.md">Routing Overview</a></td></tr>
+<tr><td>Configure every TOML field</td><td><a href="../docs/reference/toml_schema.md">TOML Schema</a></td></tr>
+<tr><td>Run launchers and servers</td><td><a href="../docs/cli_reference.md">CLI Reference</a></td></tr>
+<tr><td>Handle context overflow</td><td><a href="../docs/operations/context_window.md">Context-Window Handling</a></td></tr>
+<tr><td>Embed Rust types and algorithms</td><td><a href="../docs/reference/rust_api.md">Rust API</a></td></tr>
+<tr><td>Run a minimal Python route</td><td><a href="../examples/minimal.py"><code>examples/minimal.py</code></a></td></tr>
+<tr><td>Run libsy from Python</td><td><a href="../examples/libsy.py"><code>examples/libsy.py</code></a></td></tr>
+<tr><td>Configure Prometheus</td><td><a href="../examples/prometheus/README.md"><code>examples/prometheus/README.md</code></a></td></tr>
+</tbody>
+</table>
+</div>
+
+<nav class="pagenav">
+  <a class="next" href="stack.html"><span>Next</span>1. Technology stack →</a>
+</nav>
+
+</main>
+</body>
+</html>

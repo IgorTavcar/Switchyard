@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Idea diamonds — Switchyard Technical Wiki</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Switchyard <span>Technical Wiki</span></a>
+    <nav class="sitenav">
+      <a href="index.html">Overview</a>
+      <a href="stack.html">1. Technology stack</a>
+      <a href="concepts.html">2. Concepts</a>
+      <a href="idea-diamonds.html" aria-current="page">3. Idea diamonds</a>
+      <a href="use-cases.html">4. Use cases</a>
+      <a href="analogies.html">5. Analogy transfers</a>
+      <a href="specs.html">6. Specs &amp; APIs</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<h1>3. Idea diamonds</h1>
+
+<p class="lede">The concepts worth exposing in a product or architecture story — the high-leverage
+ideas behind the implementation.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Diamond</th><th>Exposed as</th><th>Why it matters</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>Stable client contract, movable backend</strong></td>
+  <td>Three compatible ingress APIs plus cross-format translation</td>
+  <td>Applications do not need a provider migration each time routing policy or model supply changes</td>
+</tr>
+<tr>
+  <td><strong>Provider-neutral intermediate representation</strong></td>
+  <td><code>switchyard-protocol</code></td>
+  <td>Routing, logging, and policy can be written once, like compiler passes over an IR</td>
+</tr>
+<tr>
+  <td><strong>Policy/transport separation</strong></td>
+  <td>libsy asks the host to fulfill <code>CallModel</code> steps</td>
+  <td>A gateway can adopt routing without surrendering auth, retries, sockets, or compliance boundaries</td>
+</tr>
+<tr>
+  <td><strong>Public route ID is a product; target ID is infrastructure</strong></td>
+  <td><code>routes.&lt;name&gt;.id</code> versus <code>targets.&lt;name&gt;.id</code></td>
+  <td>Teams can offer a stable “smart” model while changing the models behind it</td>
+</tr>
+<tr>
+  <td><strong>Routing evidence is explicit</strong></td>
+  <td><code>Decision</code>, selected-model/rationale headers, JSONL log</td>
+  <td>Cost/quality optimization becomes inspectable rather than hidden proxy magic</td>
+</tr>
+<tr>
+  <td><strong>Capability is contextual</strong></td>
+  <td>Target roles live inside each route</td>
+  <td>The same model can be efficient in one portfolio and capable in another</td>
+</tr>
+<tr>
+  <td><strong>Agent stage is a routing signal</strong></td>
+  <td>Stage-router scores errors, exploration, production, and tests</td>
+  <td>Multi-model systems can spend capability on uncertainty and recovery, not uniformly on every turn</td>
+</tr>
+<tr>
+  <td><strong>Lossless when possible, explicit when lossy</strong></td>
+  <td>Preservation metadata, provider extensions, translation policy</td>
+  <td>Translation can retain provider details without polluting the normalized core</td>
+</tr>
+<tr>
+  <td><strong>Failure can change the candidate set</strong></td>
+  <td>Context-window eviction and bounded retry</td>
+  <td>A retry is a routing decision, not a blind repetition against the same impossible target</td>
+</tr>
+<tr>
+  <td><strong>Streams are values with lifecycle</strong></td>
+  <td>Incremental codecs and close/completion callbacks</td>
+  <td>Cancellation, usage accounting, and resource cleanup stay correct under SSE</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="takeaway">
+<p>A useful product sentence is: <strong>Switchyard turns a model name into a governed,
+observable routing policy while preserving the client's native API.</strong></p>
+</div>
+
+<nav class="pagenav">
+  <a class="prev" href="concepts.html"><span>Previous</span>← 2. Most important concepts</a>
+  <a class="next" href="use-cases.html"><span>Next</span>4. Use cases and examples →</a>
+</nav>
+
+</main>
+</body>
+</html>

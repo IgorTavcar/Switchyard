@@ -1,0 +1,396 @@
+/* Switchyard technical wiki — standalone static pages. */
+
+:root {
+  --bg: #ffffff;
+  --surface: #f5f7f2;
+  --surface-alt: #ecefe7;
+  --text: #1b1e19;
+  --muted: #5c635a;
+  --border: #dfe3d9;
+  --accent: #76b900;
+  --link: #4a7a00;
+  --link-hover: #2f5100;
+  --code: #24291f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101210;
+    --surface: #191d18;
+    --surface-alt: #21261f;
+    --text: #e6eae1;
+    --muted: #9aa394;
+    --border: #2c322a;
+    --accent: #8fd400;
+    --link: #9ede2e;
+    --link-hover: #bdf065;
+    --code: #d7dccf;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+/* Header and site navigation */
+
+.topbar {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.topbar-inner {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 0.9rem 1.5rem;
+}
+
+.brand {
+  display: inline-block;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+}
+
+.brand span {
+  color: var(--accent);
+}
+
+.sitenav {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  font-size: 0.88rem;
+}
+
+.sitenav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.sitenav a:hover {
+  color: var(--link-hover);
+}
+
+.sitenav a[aria-current="page"] {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* Page body */
+
+main {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.25;
+  scroll-margin-top: 1rem;
+}
+
+h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.9rem;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  margin: 2.6rem 0 0.8rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+  font-size: 1.3rem;
+}
+
+h3 {
+  margin: 1.8rem 0 0.6rem;
+  font-size: 1.05rem;
+}
+
+h4 {
+  margin: 1.4rem 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lede {
+  margin: 0 0 1.6rem;
+  max-width: 46rem;
+  color: var(--muted);
+  font-size: 1.02rem;
+}
+
+p,
+ul,
+ol {
+  max-width: 46rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--link-hover);
+}
+
+/* Code */
+
+code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+
+p code,
+li code,
+td code,
+th code {
+  padding: 0.1em 0.32em;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--code);
+}
+
+pre {
+  margin: 1rem 0 1.4rem;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--code);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+pre code {
+  font-size: inherit;
+}
+
+/* Tables */
+
+.table-wrap {
+  margin: 1rem 0 1.6rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+th,
+td {
+  padding: 0.55rem 0.8rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+thead th {
+  background: var(--surface-alt);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+td.center,
+th.center {
+  text-align: center;
+}
+
+/* Index page section cards */
+
+.cards {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  margin: 1.4rem 0 2rem;
+  max-width: none;
+  padding: 0;
+  list-style: none;
+}
+
+.cards li {
+  max-width: none;
+}
+
+.cards a {
+  display: block;
+  height: 100%;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.cards a:hover {
+  border-color: var(--accent);
+}
+
+.cards strong {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.95rem;
+}
+
+.cards span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Callouts */
+
+.note {
+  margin: 1.4rem 0;
+  padding: 0.8rem 1rem;
+  max-width: 46rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 0.92rem;
+}
+
+.note p {
+  margin: 0;
+}
+
+.takeaway {
+  margin: 1.6rem 0;
+  padding: 0.9rem 1.1rem;
+  max-width: 46rem;
+  border-radius: 6px;
+  background: var(--surface-alt);
+  font-size: 0.98rem;
+}
+
+.takeaway p {
+  margin: 0;
+}
+
+/* Use-case sections */
+
+.usecase {
+  margin: 2rem 0;
+}
+
+.difference {
+  max-width: 46rem;
+  color: var(--text);
+}
+
+.difference::before {
+  content: "Difference — ";
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Diagram */
+
+.diagram {
+  margin: 1.4rem 0 1.8rem;
+  overflow-x: auto;
+}
+
+.diagram svg {
+  display: block;
+  width: 100%;
+  min-width: 40rem;
+  height: auto;
+}
+
+.diagram .node rect {
+  fill: var(--surface);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.diagram .node .t {
+  fill: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.diagram .node .s {
+  fill: var(--muted);
+  font-size: 10.5px;
+}
+
+.diagram .edge {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.4;
+}
+
+.diagram .edge-label {
+  fill: var(--muted);
+  font-size: 10.5px;
+}
+
+.diagram .arrowhead {
+  fill: var(--accent);
+}
+
+/* Footer navigation */
+
+.pagenav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 3rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.pagenav span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pagenav .next {
+  text-align: right;
+  margin-left: auto;
+}

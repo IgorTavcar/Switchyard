@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Technology stack — Switchyard Technical Wiki</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Switchyard <span>Technical Wiki</span></a>
+    <nav class="sitenav">
+      <a href="index.html">Overview</a>
+      <a href="stack.html" aria-current="page">1. Technology stack</a>
+      <a href="concepts.html">2. Concepts</a>
+      <a href="idea-diamonds.html">3. Idea diamonds</a>
+      <a href="use-cases.html">4. Use cases</a>
+      <a href="analogies.html">5. Analogy transfers</a>
+      <a href="specs.html">6. Specs &amp; APIs</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<h1>1. Technology stack</h1>
+
+<p class="lede">Runtimes, libraries, and responsibilities — which surface you pick, what each
+technology is present for, and how much any one layer is allowed to know.</p>
+
+<h2 id="runtime-surfaces">Runtime surfaces</h2>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Surface</th><th>Main technology</th><th>What it owns</th><th>Use it when</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>switchyard launch</code></td>
+  <td>Python 3.12+ CLI + packaged PyO3 Rust server</td>
+  <td>Starts Claude Code, Codex, or OpenClaw; manages the local server lifecycle</td>
+  <td>A coding agent should use a Switchyard route without manual proxy setup</td>
+</tr>
+<tr>
+  <td><code>switchyard-server</code></td>
+  <td>Rust, Tokio, Axum</td>
+  <td>Native TOML deployment, HTTP ingress, routing, translation, retries, metrics</td>
+  <td>You need a standalone production proxy</td>
+</tr>
+<tr>
+  <td><code>switchyard-libsy</code></td>
+  <td>Rust, async streams and traits</td>
+  <td>Provider-neutral algorithms; the host fulfills requested model calls</td>
+  <td>An existing Rust application already owns transport and credentials</td>
+</tr>
+<tr>
+  <td>Python library</td>
+  <td>Python async components + Rust-backed values</td>
+  <td>Fixed-shape compatibility chain, custom processors, FastAPI app factory</td>
+  <td>You need Python-native composition or a minimal YAML route bundle</td>
+</tr>
+<tr>
+  <td><code>switchyard-translation</code></td>
+  <td>Pure Rust + <code>serde_json</code></td>
+  <td>Buffered and streaming format codecs</td>
+  <td>You need protocol conversion without provider SDK or HTTP coupling</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="stack-by-concern">Stack by concern</h2>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Concern</th><th>Technology</th><th>Why it is present</th></tr></thead>
+<tbody>
+<tr><td>Core orchestration</td><td>Rust, Tokio, <code>futures</code></td><td>Predictable async execution, typed algorithms, and low-overhead streams</td></tr>
+<tr><td>Python integration</td><td>Python 3.12+, PyO3, Maturin</td><td>Python packaging and extension bindings over the Rust-owned core</td></tr>
+<tr><td>Native HTTP server</td><td>Axum + Hyper</td><td>Concurrent OpenAI/Anthropic-compatible ingress and SSE relay</td></tr>
+<tr><td>Python HTTP server</td><td>FastAPI + Uvicorn + <code>sse-starlette</code></td><td>Composable Python app factory and endpoint extensions</td></tr>
+<tr><td>Provider clients</td><td>Native HTTP in Rust; OpenAI, Anthropic, and <code>httpx</code> in Python</td><td>Calls OpenAI-compatible and Anthropic-compatible upstreams</td></tr>
+<tr><td>Data contracts</td><td><code>serde</code>, <code>serde_json</code>, Pydantic/provider SDK types at Python edges</td><td>Typed internal contracts with JSON-compatible boundaries</td></tr>
+<tr><td>Configuration</td><td>TOML for native deployments; minimal YAML for <code>switchyard serve</code></td><td>Explicit, reviewable topology separated from secrets</td></tr>
+<tr><td>Observability</td><td>OpenTelemetry, Prometheus text, structured logs, JSONL routing logs</td><td>Per-route decisions, usage, latency, error, and session attribution</td></tr>
+<tr><td>Quality</td><td>Cargo tests, pytest, pytest-asyncio, respx, Ruff, strict mypy, strict MkDocs</td><td>Cross-language correctness and published-doc validation</td></tr>
+<tr><td>Packaging</td><td>Cargo/crates.io, Maturin wheels, <code>nemo-switchyard</code>, <code>uv</code></td><td>Standalone Rust and Python-distributed execution paths</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="responsibility-boundaries">Responsibility boundaries</h2>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Layer</th><th class="center">Knows about routing?</th><th class="center">Knows about providers?</th><th class="center">Makes network calls?</th></tr></thead>
+<tbody>
+<tr><td><code>switchyard-protocol</code></td><td class="center">Carries decisions</td><td class="center">Only wire-format identity and preserved fields</td><td class="center">No</td></tr>
+<tr><td><code>switchyard-translation</code></td><td class="center">No</td><td class="center">Yes, as codecs</td><td class="center">No</td></tr>
+<tr><td><code>switchyard-libsy</code></td><td class="center">Yes</td><td class="center">No; it works on normalized envelopes</td><td class="center">No</td></tr>
+<tr><td><code>switchyard-llm-client</code> / server clients</td><td class="center">Receives a selected target</td><td class="center">Yes</td><td class="center">Yes</td></tr>
+<tr><td><code>switchyard-server</code></td><td class="center">Composes the whole path</td><td class="center">Yes, through configured clients</td><td class="center">Yes</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="note">
+<p>The native server path is the feature-complete deployment surface. The Python
+<code>switchyard serve --routes</code> path intentionally accepts only the minimal YAML
+<code>noop</code> and <code>passthrough</code> bundle; native routing deployments use TOML.</p>
+</div>
+
+<nav class="pagenav">
+  <a class="prev" href="index.html"><span>Previous</span>← Overview</a>
+  <a class="next" href="concepts.html"><span>Next</span>2. Most important concepts →</a>
+</nav>
+
+</main>
+</body>
+</html>
