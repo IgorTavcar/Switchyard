@@ -13,3 +13,18 @@
   --md-primary-fg-color--dark: #5a8c00;
   --md-accent-fg-color: #76B900;
 }
+
+/* Collapsible hierarchy used by the technical wiki. */
+.wiki-tree details.wiki-node {
+  margin: 0.65rem 0 0.65rem 0.55rem;
+  padding-left: 0.8rem;
+  border-left: 2px solid color-mix(in srgb, var(--md-primary-fg-color) 45%, transparent);
+}
+
+.wiki-tree details.wiki-node > summary {
+  cursor: pointer;
+}
+
+.wiki-tree details.wiki-node > summary::marker {
+  color: var(--md-primary-fg-color);
+}
